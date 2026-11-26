@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:18
+    container_name: simswap-db
+    environment:
+      POSTGRES_USER: ccdev
+      POSTGRES_PASSWORD: ccdev
+      POSTGRES_DB: ccdev
+    # 映射到宿主 5433，避免与本机预装 PostgreSQL 的 5432 冲突；
+    # compose 内 app 仍通过 db:5432 访问。
+    ports:
+      - "127.0.0.1:5433:5432"
+    # PostgreSQL 18 官方镜像默认 PGDATA 位于 /var/lib/postgresql/18/docker，
+    # 挂载父目录 /var/lib/postgresql 对 17/18 均兼容。
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccdev -d ccdev"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: simswap-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://ccdev:ccdev@db:5432/ccdev
+      ALLOW_RESET: "true"
+      SIM_AUTO_START: "true"
+      SIM_TICK_REAL_MS: "2500"
+      UNKNOWN_GRACE_MIN: "1"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
